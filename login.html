@@ -1,0 +1,12 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Login Admin – NGODENG CUKIR</title>
+<style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#a30000;font:16px system-ui,sans-serif}
+form{background:#fff7ea;padding:26px;border-radius:16px;width:min(340px,92vw);display:grid;gap:10px}h1{margin:0;color:#a30000;font-size:22px;font-weight:900;text-align:center}
+input{padding:12px;font:inherit;border:2px solid #111;border-radius:10px}button{padding:13px;border:0;border-radius:10px;background:#ffd600;font:inherit;font-weight:900;cursor:pointer}small{color:#a30000;text-align:center;min-height:1em}</style></head><body>
+<form id="f"><h1>NGODENG CUKIR<br><small style="color:#111">Admin</small></h1><input id="em" type="email" placeholder="Email" required><input id="pw" type="password" placeholder="Password" required><button>Masuk</button><small id="err"></small></form>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script><script src="common.js"></script>
+<script>
+sb.auth.getSession().then(({data})=>{if(data.session)location.href='admin.html'});
+$('#f').onsubmit=async e=>{e.preventDefault();$('#err').textContent='';
+  const{error}=await sb.auth.signInWithPassword({email:$('#em').value,password:$('#pw').value});
+  if(error)$('#err').textContent='Email atau password salah.';else location.href='admin.html'};
+</script></body></html>
