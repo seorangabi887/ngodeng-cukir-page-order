@@ -1,0 +1,116 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Pesan – Odeng Odengan</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{--red:#a30000;--yel:#ffd600;--cream:#ffeccf}
+*{box-sizing:border-box}body{margin:0;font:16px/1.4 system-ui,sans-serif;background:var(--cream);color:#111;padding-bottom:110px}
+header{background:var(--red);color:var(--yel);padding:16px;font-size:26px;font-weight:900;letter-spacing:-.5px}
+main{max-width:560px;margin:auto;padding:14px}
+h2{margin:22px 0 8px;font-size:18px;color:var(--red)}
+input,select{width:100%;padding:13px;font:inherit;border:2px solid #111;border-radius:10px;background:#fff;margin-bottom:8px}
+.seg{display:flex;gap:8px}.seg label{flex:1;border:2px solid #111;border-radius:10px;padding:10px;background:#fff;font-weight:700}
+.seg input{width:auto;margin:0 6px 0 0}.seg label:has(input:checked){background:var(--yel)}
+.row{display:flex;align-items:center;gap:10px;background:#fff;border-radius:12px;padding:10px 12px;margin-bottom:8px}
+.row .n{flex:1}.row small{display:block;color:#555}
+.st{display:flex;align-items:center;gap:6px}.st b{min-width:26px;text-align:center;font-size:18px}
+button{font:inherit;cursor:pointer}.st button{width:42px;height:42px;border-radius:50%;border:2px solid #111;background:var(--yel);font-size:22px;font-weight:900}
+.ind{background:#fff;border-radius:12px;padding:10px;margin-bottom:8px}.ind .st{justify-content:space-between}
+.ghost{width:100%;padding:12px;border:2px dashed var(--red);background:none;color:var(--red);font-weight:800;border-radius:10px}
+.del{border:0;background:none;color:var(--red);font-weight:800}
+#bar{position:fixed;left:0;right:0;bottom:0;background:#111;color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px}
+#bar div{flex:1}#bar b{color:var(--yel);font-size:20px}
+#go{background:var(--yel);border:0;border-radius:12px;padding:14px 20px;font-weight:900;font-size:16px}#go:disabled{opacity:.5}
+.msg{background:#fff;border-left:6px solid var(--red);padding:12px;border-radius:8px;margin:10px 0}
+.link{word-break:break-all;background:#fff;padding:10px;border-radius:8px;font-size:14px}
+</style></head><body>
+<header>Odeng Odengan</header>
+<main id="app"><p>Memuat…</p></main>
+<div id="bar" hidden><div>Total <b id="tot">Rp0</b><br><small id="cnt"></small></div><button id="go"></button></div>
+<script>
+const SB_URL='https://iaykluivjexwkekbfzea.supabase.co', SB_KEY='sb_publishable_Vib3ZorIk3Skci1E8mY-4Q_eMR_zZSD';   // ← isi dari Supabase > Settings > API
+const sb=supabase.createClient(SB_URL,SB_KEY);
+const $=s=>document.querySelector(s), rp=n=>'Rp'+n.toLocaleString('id-ID');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const BROTH=['Kaldu Ikan','Tomyum'];
+let P=[],mode='collective',cart={},rows=[],order=null,busy=false;
+const token=new URLSearchParams(location.search).get('t');
+const keys=()=>P.flatMap(p=>p.has_broth?BROTH.map(b=>p.id+'|'+b):[p.id+'|']);
+const info=k=>{const[id,b]=k.split('|');const p=P.find(x=>x.id==id);return{p,b,label:p.name+(b?' – '+b:'')}};
+
+async function init(){
+  const[{data:prods,error},{data:st}]=await Promise.all([sb.from('products').select('*').eq('active',true).order('sort'),sb.from('settings').select('*').single()]);
+  if(error){$('#app').innerHTML='<div class="msg">Gagal memuat menu. Coba muat ulang.</div>';return}
+  P=prods;
+  if(token){const{data,error}=await sb.rpc('get_order',{p_token:token});
+    if(error||!data){$('#app').innerHTML='<div class="msg">Link pesanan tidak valid.</div>';return}
+    order=data;mode=data.mode;
+    if(mode=='collective')data.items.forEach(i=>cart[i.pid+'|'+(i.broth||'')]=i.qty);
+    else rows=data.items.map(i=>({who:i.who,key:i.pid+'|'+(i.broth||''),qty:i.qty}));
+  }else if(st&&!(st.open&&(!st.deadline||new Date()<new Date(st.deadline)))){
+    $('#app').innerHTML='<div class="msg"><b>Pemesanan sudah ditutup.</b> Hubungi admin lewat WhatsApp.</div>';return}
+  if(mode=='individual'&&!rows.length)rows=[{who:'',key:keys()[0],qty:1}];
+  draw();
+}
+function draw(){
+  const locked=order&&!order.can_edit;
+  $('#app').innerHTML=`
+  ${order?`<div class="msg">Pesanan <b>OD-${order.num}</b> · status: <b>${esc(order.status)}</b>${locked?'<br>Pesanan sudah dikunci, hubungi admin untuk perubahan.':''}</div>`:''}
+  <h2>Data pemesan</h2>
+  <input id="rep" placeholder="Nama perwakilan" value="${esc(order?.rep)}" ${locked?'disabled':''}>
+  <input id="room" placeholder="Nomor kamar" value="${esc(order?.room)}" ${order?'disabled':''}>
+  <div class="seg"><label><input type="radio" name="m" value="collective" ${mode=='collective'?'checked':''} ${order?'disabled':''}>Jumlah saja</label>
+  <label><input type="radio" name="m" value="individual" ${mode=='individual'?'checked':''} ${order?'disabled':''}>Per nama</label></div>
+  <div id="list"></div>`;
+  document.querySelectorAll('[name=m]').forEach(r=>r.onchange=()=>{mode=r.value;if(mode=='individual'&&!rows.length)rows=[{who:'',key:keys()[0],qty:1}];list()});
+  list();$('#bar').hidden=locked;
+}
+const stepper=(a,q)=>`<div class="st"><button data-a="${a}" data-d="-1">−</button><b>${q}</b><button data-a="${a}" data-d="1">+</button></div>`;
+function list(){
+  let h='';
+  if(mode=='collective'){
+    for(const[title,hb]of[['Combo Odeng (pilih kuah)',true],['Tokpokki',false]]){
+      h+=`<h2>${title}</h2>`;
+      for(const k of keys().filter(k=>info(k).p.has_broth==hb)){const{p,b}=info(k);
+        h+=`<div class="row"><div class="n"><b>${esc(p.name)}</b>${b?` – ${b}`:''}<small>${rp(p.price)}</small></div>${stepper('c:'+k,cart[k]||0)}</div>`}}
+  }else{
+    h+='<h2>Daftar pesanan per orang</h2>';
+    rows.forEach((r,i)=>{h+=`<div class="ind"><input data-i="${i}" data-f="who" placeholder="Nama pemesan" value="${esc(r.who)}">
+      <select data-i="${i}" data-f="key">${keys().map(k=>`<option value="${k}" ${k==r.key?'selected':''}>${esc(info(k).label)} (${rp(info(k).p.price)})</option>`).join('')}</select>
+      <div class="st">${stepper('r:'+i,r.qty)}<button class="del" data-del="${i}">Hapus</button></div></div>`});
+    h+='<button class="ghost" id="add">+ Tambah pesanan</button>';
+  }
+  $('#list').innerHTML=h;sum();
+}
+document.addEventListener('click',e=>{
+  const t=e.target;
+  if(t.dataset.a){const[kind,k]=[t.dataset.a.slice(0,1),t.dataset.a.slice(2)],d=+t.dataset.d;
+    if(kind=='c')cart[k]=Math.max(0,(cart[k]||0)+d);else rows[k].qty=Math.min(500,Math.max(1,rows[k].qty+d));list()}
+  if(t.dataset.del!==undefined){rows.splice(+t.dataset.del,1);if(!rows.length)rows=[{who:'',key:keys()[0],qty:1}];list()}
+  if(t.id=='add'){rows.push({who:'',key:rows.at(-1)?.key||keys()[0],qty:1});list()}
+});
+document.addEventListener('change',e=>{const t=e.target;if(t.dataset.f){rows[+t.dataset.i][t.dataset.f]=t.value;sum()}});
+document.addEventListener('input',e=>{const t=e.target;if(t.dataset.f=='who')rows[+t.dataset.i].who=t.value});
+function lines(){return mode=='collective'?Object.entries(cart).filter(([,q])=>q>0).map(([k,q])=>({key:k,qty:q,who:''})):rows.filter(r=>r.qty>0)}
+function sum(){const L=lines();let q=0,t=0;L.forEach(l=>{q+=l.qty;t+=l.qty*info(l.key).p.price});
+  $('#tot').textContent=rp(t);$('#cnt').textContent=q+' item';$('#go').textContent=order?'Simpan perubahan':'Kirim pesanan'}
+$('#go').onclick=async()=>{
+  if(busy)return;
+  const rep=$('#rep').value.trim(),room=$('#room').value.trim(),L=lines();
+  if(!rep||!room)return alert('Nama perwakilan dan nomor kamar wajib diisi.');
+  if(!L.length)return alert('Pilih minimal satu menu.');
+  if(mode=='individual'&&L.some(l=>!l.who.trim()))return alert('Isi nama pemesan di setiap baris.');
+  const items=L.map(l=>{const{p,b}=info(l.key);return{pid:p.id,broth:b||null,qty:l.qty,who:l.who.trim()}});
+  busy=true;$('#go').disabled=true;
+  const{data,error}=order?await sb.rpc('update_order',{p_token:token,p_rep:rep,p_items:items})
+    :await sb.rpc('create_order',{p_room:room,p_rep:rep,p_mode:mode,p_items:items});
+  busy=false;$('#go').disabled=false;
+  if(error)return alert('Gagal: '+error.message);
+  if(order){order=data;alert('Perubahan tersimpan.');return draw()}
+  const o=data[0],url=location.origin+location.pathname+'?t='+o.token;
+  $('#bar').hidden=true;
+  $('#app').innerHTML=`<h2>Pesanan terkirim ✓</h2><div class="msg">Nomor pesanan: <b>OD-${o.num}</b><br>Simpan link ini untuk mengubah pesanan sebelum batas waktu:</div>
+  <div class="link">${esc(url)}</div><p><button class="ghost" onclick="navigator.clipboard.writeText('${url}').then(()=>alert('Link disalin'))">Salin link</button></p>
+  <p><a href="${esc(url)}">Lihat / ubah pesanan</a></p>`;
+};
+init();
+</script></body></html>

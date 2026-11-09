@@ -1,0 +1,108 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin – Odeng Odengan</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{--red:#a30000;--yel:#ffd600;--cream:#ffeccf}
+*{box-sizing:border-box}body{margin:0;font:15px/1.4 system-ui,sans-serif;background:var(--cream);color:#111}
+header{background:var(--red);color:var(--yel);padding:12px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+header h1{margin:0 auto 0 0;font-size:22px;font-weight:900}
+nav button,.b{border:2px solid #111;background:#fff;border-radius:8px;padding:7px 12px;font:inherit;font-weight:700;cursor:pointer}
+nav button.on{background:var(--yel)}main{padding:14px;max-width:1100px;margin:auto}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden}
+th,td{padding:8px;text-align:left;border-bottom:1px solid #ddd;vertical-align:top}th{background:#111;color:#fff}
+input,select{font:inherit;padding:7px;border:2px solid #111;border-radius:8px;background:#fff}
+.wrap{overflow-x:auto}.tag{background:var(--yel);padding:1px 7px;border-radius:99px;font-size:12px;font-weight:800}
+.cards{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}.card{background:#fff;border-radius:10px;padding:10px 14px}.card b{font-size:22px;display:block}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.room{background:#fff;border-radius:10px;padding:10px;margin-bottom:8px}
+#login{max-width:340px;margin:60px auto;display:grid;gap:8px}
+</style></head><body>
+<div id="login"><h1>Admin Odeng Odengan</h1><input id="em" type="email" placeholder="Email"><input id="pw" type="password" placeholder="Password"><button class="b" id="in">Masuk</button><small id="err"></small></div>
+<div id="adm" hidden>
+<header><h1>Odeng Odengan · Admin</h1><nav id="nav"></nav><button class="b" id="out">Keluar</button></header>
+<main id="m"></main></div>
+<script>
+const SB_URL='https://iaykluivjexwkekbfzea.supabase.co', SB_KEY='sb_publishable_Vib3ZorIk3Skci1E8mY-4Q_eMR_zZSD';
+const sb=supabase.createClient(SB_URL,SB_KEY);
+const $=s=>document.querySelector(s),rp=n=>'Rp'+(+n).toLocaleString('id-ID');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ST=['baru','dikonfirmasi','disiapkan','selesai','batal'];
+let tab='orders',O=[],P=[],S={},fq='',fs='';
+const lab=i=>i.name+(i.broth?' – '+i.broth:'');
+const active=()=>O.filter(o=>o.status!='batal');
+const nm=o=>'OD-'+o.num;
+
+$('#in').onclick=async()=>{const{error}=await sb.auth.signInWithPassword({email:$('#em').value,password:$('#pw').value});
+  if(error)$('#err').textContent='Email atau password salah.';else start()};
+$('#out').onclick=async()=>{await sb.auth.signOut();location.reload()};
+(async()=>{if((await sb.auth.getSession()).data.session)start()})();
+async function start(){$('#login').hidden=true;$('#adm').hidden=false;
+  $('#nav').innerHTML=[['orders','Pesanan'],['kitchen','Dapur'],['products','Produk'],['settings','Pengaturan']].map(([k,l])=>`<button data-t="${k}">${l}</button>`).join('');
+  $('#nav').onclick=e=>{if(e.target.dataset.t){tab=e.target.dataset.t;draw()}};
+  await load();setInterval(()=>{if(tab!='products'&&tab!='settings'&&!document.activeElement.closest('main'))load()},30000)}
+async function load(){
+  [O,P,S]=await Promise.all([sb.from('orders').select('*').order('created_at').then(r=>r.data||[]),
+    sb.from('products').select('*').order('sort').then(r=>r.data||[]),sb.from('settings').select('*').single().then(r=>r.data||{})]);draw()}
+function draw(){
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab));
+  $('#m').innerHTML={orders:vOrders,kitchen:vKitchen,products:vProducts,settings:vSettings}[tab]();
+}
+/* ---------- Pesanan ---------- */
+function vOrders(){
+  const a=active(),L=O.filter(o=>(!fs||o.status==fs)&&(!fq||(o.room+o.rep+nm(o)).toLowerCase().includes(fq.toLowerCase())));
+  return `<div class="cards"><div class="card">Kamar<b>${new Set(a.map(o=>o.room)).size}</b></div>
+  <div class="card">Item<b>${a.reduce((s,o)=>s+o.items.reduce((x,i)=>x+i.qty,0),0)}</b></div>
+  <div class="card">Omzet (tanpa batal)<b>${rp(a.reduce((s,o)=>s+o.total,0))}</b></div>
+  <div class="card">Belum lunas<b>${a.filter(o=>!o.paid).length}</b></div>
+  <div class="card">Diubah<b>${a.filter(o=>o.modified).length}</b></div></div>
+  <div class="bar"><input placeholder="Cari kamar / nama / nomor" value="${esc(fq)}" oninput="fq=this.value;clearTimeout(window.t);window.t=setTimeout(draw,400)">
+  <select onchange="fs=this.value;draw()"><option value="">Semua status</option>${ST.map(s=>`<option ${s==fs?'selected':''}>${s}</option>`).join('')}</select>
+  <button class="b" onclick="load()">Muat ulang</button></div>
+  <div class="wrap"><table><tr><th>No</th><th>Kamar</th><th>Perwakilan</th><th>Mode</th><th>Item</th><th>Total</th><th>Status</th><th>Lunas</th><th>Aksi</th></tr>
+  ${L.map(o=>`<tr><td>${nm(o)} ${o.modified?'<span class="tag">DIUBAH</span>':''}</td><td>${esc(o.room)}</td><td>${esc(o.rep)}</td>
+  <td>${o.mode=='individual'?'per nama':'jumlah'}</td><td>${o.items.reduce((s,i)=>s+i.qty,0)}</td><td>${rp(o.total)}</td>
+  <td><select onchange="setSt('${o.id}',this.value)">${ST.map(s=>`<option ${s==o.status?'selected':''}>${s}</option>`).join('')}</select></td>
+  <td><input type="checkbox" ${o.paid?'checked':''} onchange="setPaid('${o.id}',this.checked)"></td>
+  <td><button class="b" onclick="printR('${o.id}','58mm')">58</button> <button class="b" onclick="printR('${o.id}','80mm')">80</button> <button class="b" onclick="printR('${o.id}','A4')">A4</button>
+  <button class="b" onclick="hist('${o.id}')">Riwayat</button> <button class="b" onclick="navigator.clipboard.writeText(location.href.replace('admin.html','order.html')+'?t=${o.token}');alert('Link ketua kamar disalin')">Link</button></td></tr>`).join('')||'<tr><td colspan="9">Belum ada pesanan.</td></tr>'}</table></div>`}
+async function setSt(id,s){if(s=='batal'&&!confirm('Batalkan pesanan ini? Tidak akan dihitung di dapur dan omzet.'))return load();
+  await sb.from('orders').update({status:s,updated_at:new Date()}).eq('id',id);load()}
+async function setPaid(id,v){await sb.from('orders').update({paid:v}).eq('id',id);load()}
+function hist(id){const o=O.find(x=>x.id==id),s=a=>a.map(i=>`${i.qty}× ${lab(i)}${i.who?' ('+i.who+')':''}`).join(', ');
+  alert(o.history.length?o.history.map(h=>`${new Date(h.at).toLocaleString('id-ID')} – ${h.by}\nSebelum (${rp(h.from_total)}): ${s(h.from_items)}\nSesudah (${rp(h.to_total)}): ${s(h.to_items)}`).join('\n\n'):'Belum ada perubahan.')}
+/* ---------- Struk ---------- */
+function agg(items){const m={};items.forEach(i=>{const k=lab(i)+'|'+i.price;m[k]=m[k]||{n:lab(i),p:i.price,q:0};m[k].q+=i.qty});return Object.values(m)}
+function printR(id,w){const o=O.find(x=>x.id==id),a4=w=='A4',fs=a4?'14px':w=='58mm'?'11px':'12px';
+  const per=o.mode=='individual'?`<hr><b>Per nama:</b>${Object.entries(o.items.reduce((m,i)=>((m[i.who]=m[i.who]||[]).push(`${i.qty}× ${lab(i)}`),m),{})).map(([n,l])=>`<div>${esc(n)}: ${esc(l.join(', '))}</div>`).join('')}`:'';
+  const h=`<html><head><title>${nm(o)}</title><style>@page{size:${a4?'A4':w+' auto'};margin:${a4?'15mm':'2mm'}}
+  body{font:${fs}/1.35 monospace;width:${a4?'auto':'100%'};margin:0}table{width:100%;border-collapse:collapse}td{vertical-align:top;padding:1px 0}.r{text-align:right}hr{border:0;border-top:1px dashed #000}</style></head><body>
+  <center><b style="font-size:1.4em">ODENG ODENGAN</b></center><div>No: ${nm(o)}<br>Tgl: ${new Date(o.created_at).toLocaleString('id-ID')}<br>Kamar: ${esc(o.room)}<br>Perwakilan: ${esc(o.rep)}</div><hr>
+  <table>${agg(o.items).map(r=>`<tr><td colspan="2">${esc(r.n)}</td></tr><tr><td>${r.q} × ${rp(r.p)}</td><td class="r">${rp(r.q*r.p)}</td></tr>`).join('')}</table><hr>
+  <table><tr><td><b>TOTAL</b></td><td class="r"><b>${rp(o.total)}</b></td></tr></table><div>Status bayar: <b>${o.paid?'LUNAS':'BELUM LUNAS'}</b></div>${per}<hr><center>Terima kasih</center></body></html>`;
+  const win=open('','_blank');win.document.write(h);win.document.close();setTimeout(()=>win.print(),300)}
+/* ---------- Dapur / Rekap ---------- */
+function totals(){const m={};active().forEach(o=>o.items.forEach(i=>{const k=lab(i);m[k]=m[k]||{n:lab(i),q:0,r:0};m[k].q+=i.qty;m[k].r+=i.qty*i.price}));return Object.values(m)}
+function vKitchen(){const T=totals();
+  return `<div class="bar"><button class="b" onclick="csv('rekap')">Unduh rekap (CSV)</button><button class="b" onclick="csv('detail')">Unduh detail per kamar (CSV)</button><button class="b" onclick="window.print()">Cetak halaman</button></div>
+  <h2>Total produksi</h2><div class="wrap"><table><tr><th>Menu</th><th>Jumlah</th><th>Omzet</th></tr>${T.map(t=>`<tr><td>${esc(t.n)}</td><td style="font-size:22px"><b>${t.q}</b></td><td>${rp(t.r)}</td></tr>`).join('')||'<tr><td colspan="3">Belum ada pesanan aktif.</td></tr>'}
+  <tr><th>Total</th><th>${T.reduce((s,t)=>s+t.q,0)}</th><th>${rp(T.reduce((s,t)=>s+t.r,0))}</th></tr></table></div>
+  <h2>Packing per kamar</h2>${active().map(o=>`<div class="room"><b>Kamar ${esc(o.room)}</b> · ${esc(o.rep)} · ${nm(o)} ${o.modified?'<span class="tag">DIUBAH</span>':''}<br>
+  ${agg(o.items).map(r=>`${r.q}× ${esc(r.n)}`).join('<br>')}<br><b>Total ${o.items.reduce((s,i)=>s+i.qty,0)} item</b></div>`).join('')}`}
+function csv(kind){const rows=kind=='rekap'?[['Menu','Jumlah','Omzet'],...totals().map(t=>[t.n,t.q,t.r])]
+  :[['No','Kamar','Perwakilan','Nama','Menu','Kuah','Jumlah','Harga','Subtotal'],...active().flatMap(o=>o.items.map(i=>[nm(o),o.room,o.rep,i.who,i.name,i.broth||'',i.qty,i.price,i.qty*i.price]))];
+  const t='\ufeff'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'text/csv'}));a.download=`odeng-${kind}-${new Date().toISOString().slice(0,10)}.csv`;a.click()}
+/* ---------- Produk ---------- */
+function vProducts(){return `<div class="wrap"><table><tr><th>Nama</th><th>Harga</th><th>Kuah?</th><th>Aktif</th><th>Urut</th></tr>
+  ${P.map(p=>`<tr><td><input value="${esc(p.name)}" onchange="upP('${p.id}',{name:this.value})"></td><td><input type="number" min="0" step="500" value="${p.price}" onchange="upP('${p.id}',{price:+this.value})"></td>
+  <td><input type="checkbox" ${p.has_broth?'checked':''} onchange="upP('${p.id}',{has_broth:this.checked})"></td><td><input type="checkbox" ${p.active?'checked':''} onchange="upP('${p.id}',{active:this.checked})"></td>
+  <td><input type="number" style="width:60px" value="${p.sort}" onchange="upP('${p.id}',{sort:+this.value})"></td></tr>`).join('')}</table></div>
+  <div class="bar"><input id="np" placeholder="Nama produk baru"><input id="pp" type="number" placeholder="Harga"><label><input id="pb" type="checkbox"> pilih kuah</label><button class="b" onclick="addP()">Tambah</button></div>
+  <small>Ubah harga hanya memengaruhi pesanan baru; pesanan lama menyimpan harga saat dipesan.</small>`}
+async function upP(id,v){const{error}=await sb.from('products').update(v).eq('id',id);if(error)alert(error.message);load()}
+async function addP(){if(!$('#np').value||!$('#pp').value)return;await sb.from('products').insert({name:$('#np').value,price:+$('#pp').value,has_broth:$('#pb').checked,sort:P.length+1});load()}
+/* ---------- Pengaturan ---------- */
+function vSettings(){const d=S.deadline?new Date(new Date(S.deadline)-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,16):'';
+  return `<div class="room"><label><input type="checkbox" id="so" ${S.open?'checked':''}> Pemesanan dibuka</label><p>Batas pesan & ubah pesanan:<br><input type="datetime-local" id="sd" value="${d}"></p>
+  <button class="b" onclick="saveS()">Simpan</button><p><small>Setelah batas waktu, ketua kamar tidak bisa pesan atau mengubah.</small></p></div>`}
+async function saveS(){const{error}=await sb.from('settings').update({open:$('#so').checked,deadline:$('#sd').value?new Date($('#sd').value).toISOString():null}).eq('id',1);alert(error?error.message:'Tersimpan');load()}
+</script></body></html>
