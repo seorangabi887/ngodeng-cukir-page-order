@@ -61,7 +61,7 @@ async function init(){
 function shop(){
   $('#pay').hidden=true;$('#shop').hidden=false;const ed=!!order;
   $('#info').innerHTML=`<div class="card"><b>Data pemesan</b>${ed?' · OD-'+order.num:''}
-  <input id="rep" placeholder="Nama perwakilan" value="${esc(rep)}"><input id="room" placeholder="Nomor kamar" value="${esc(room)}" ${ed?'disabled':''}>
+  <input id="rep" placeholder="Nama perwakilan" value="${esc(rep)}"><input id="room" placeholder="Nomor" value="${esc(room)}" ${ed?'disabled':''}>
   <div class="seg"><label><input type="radio" name="m" value="collective" ${mode=='collective'?'checked':''} ${ed?'disabled':''}>Jumlah saja</label>
   <label><input type="radio" name="m" value="individual" ${mode=='individual'?'checked':''} ${ed?'disabled':''}>Per nama</label></div></div>`;
   if(mode=='individual'&&!people.length)people=[newP()];
@@ -98,7 +98,7 @@ function listHTML(L,edit){
   if(!L.some(i=>i.who))return L.map((i,k)=>`<div class="li"><div><b>${i.qty}×</b> ${tomy(lab(i))}${i.note?`<small>📝 ${esc(i.note)}</small>`:''}</div><div style="text-align:right">${rp(i.qty*i.price)}${edit?stepper('c:'+k+':0',i.qty):''}</div></div>`).join('');
   return Object.entries(group(L)).map(([w,a])=>`<div class="li pe"><b>${esc(w)}</b>${a.map(i=>`<div><span>${i.qty}× ${tomy(lab(i))}</span><span>${rp(i.qty*i.price)}</span></div>`).join('')}${a[0].note?`<small>📝 ${esc(a[0].note)}</small>`:''}</div>`).join('')}
 function validate(){
-  if(!rep.trim()||!room.trim())return 'Nama perwakilan dan nomor kamar wajib diisi.';
+  if(!rep.trim()||!room.trim())return 'Nama perwakilan dan nomor wajib diisi.';
   if(mode=='individual')for(const h of people){if(!h.who.trim())return 'Isi nama pemesan di setiap blok.';
     for(const it of h.items){const p=prod(it.pid);if(!p)return 'Pilih menu untuk '+h.who+'.';if(p.has_broth&&!it.broth)return 'Pilih kuah untuk '+h.who+'.'}}
   return items().length?'':'Pilih minimal satu menu.'}
