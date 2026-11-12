@@ -48,7 +48,7 @@ function vOrders(){const a=active(),L=O.filter(o=>(!fs||o.status==fs)&&(!fq||(o.
   <td>${o.mode=='individual'?'per nama':'jumlah'}</td><td>${o.items.reduce((s,i)=>s+i.qty,0)}</td><td>${rp(o.total)}</td>
   <td><select onchange="setSt('${o.id}',this.value)">${ST.map(s=>`<option ${s==o.status?'selected':''}>${s}</option>`).join('')}</select></td>
   <td><input type="checkbox" ${o.paid?'checked':''} onchange="setPaid('${o.id}',this.checked)"></td>
-  <td><button class="b" onclick="printR('${o.id}')">Struk</button> <button class="b" onclick="hist('${o.id}')">Riwayat</button> <button class="b" onclick="navigator.clipboard.writeText(location.origin+'/order?t=${o.token}');alert('Link ketua kamar disalin')">Link</button></td></tr>`).join('')||`<tr><td colspan="10">Belum ada pesanan${ALL?'':' di tanggal ini'}.</td></tr>`}</table></div>`}
+  <td><button class="b" onclick="printR('${o.id}')">Struk JPG</button> <button class="b" onclick="hist('${o.id}')">Riwayat</button> <button class="b" onclick="navigator.clipboard.writeText(location.origin+'/order?t=${o.token}');alert('Link ketua kamar disalin')">Link</button></td></tr>`).join('')||`<tr><td colspan="10">Belum ada pesanan${ALL?'':' di tanggal ini'}.</td></tr>`}</table></div>`}
 async function setSt(id,s){if(s=='batal'&&!confirm('Batalkan pesanan ini? Tidak dihitung di dapur dan omzet.'))return load();
   await sb.from('orders').update({status:s,updated_at:new Date()}).eq('id',id);load()}
 async function setPaid(id,v){await sb.from('orders').update({paid:v}).eq('id',id);load()}
@@ -60,15 +60,45 @@ function hist(id){const o=O.find(x=>x.id==id),H=[...o.history].reverse();
   ${d.map(([k,v])=>`<div class="${v>0?'add':'rem'}">${v>0?'＋ Tambah':'－ Kurang'} ${Math.abs(v)}× ${tomy(k)}</div>`).join('')||'<div>Tidak ada perubahan item</div>'}
   <small>Total: ${rp(h.from_total)} → <b>${rp(h.to_total)}</b></small></div>`}).join('')||'<p>Belum ada perubahan setelah pesanan dibuat.</p>'}
   <div class="hc">Pesanan dibuat · ${tm(o.created_at)}</div><button class="b" onclick="$('#dlg').close()">Tutup</button>`;$('#dlg').showModal()}
-/* ---------- Struk (1 printer kecil) ---------- */
-function printR(id){const o=O.find(x=>x.id==id),ind=o.mode=='individual',m={};
+/* ---------- Struk JPG (kertas thermal 58mm) ---------- */
+const RW=576,PAD=34,FONT='"DejaVu Sans",Arial,Helvetica,sans-serif';
+function wrapText(ctx,t,mw){const out=[];let l='';for(const w of String(t).split(' ')){const x=l?l+' '+w:w;if(l&&ctx.measureText(x).width>mw){out.push(l);l=w}else l=x}if(l)out.push(l);return out}
+// logo diubah jadi hitam-putih murni supaya tercetak tegas di printer thermal
+function loadLogo(){return new Promise(res=>{let i=0;const t=()=>{if(i>=EXT.length)return res(null);const im=new Image();im.onload=()=>{const w=270,h=Math.round(im.height*w/im.width),c=document.createElement('canvas');c.width=w;c.height=h;
+  const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);const d=x.getImageData(0,0,w,h);
+  for(let k=0;k<d.data.length;k+=4){const v=.299*d.data[k]+.587*d.data[k+1]+.114*d.data[k+2]<150?0:255;d.data[k]=d.data[k+1]=d.data[k+2]=v;d.data[k+3]=255}x.putImageData(d,0,0);res(c)};
+  im.onerror=t;im.src='img/logo.'+EXT[i++]};t()})}
+function drawReceipt(ctx,o,logo){
+  const L=PAD,R=RW-PAD,MW=R-L;let y=24;
+  const T=(t,x,yy,f,al='left')=>{ctx.font=f;ctx.textAlign=al;ctx.fillText(t,x,yy)};
+  const line=()=>{ctx.fillRect(L,y,MW,2);y+=22};
+  ctx.fillStyle='#000';ctx.textBaseline='alphabetic';
+  if(logo){const w=logo.width,h=logo.height;ctx.drawImage(logo,(RW-w)/2,y,w,h);y+=h+22}
+  T(BRAND,RW/2,y+26,`bold 29px ${FONT}`,'center');y+=36;T('STRUK PESANAN',RW/2,y+18,`17px ${FONT}`,'center');y+=36;line();
+  const dt=new Date(o.created_at).toLocaleString('id-ID',{timeZone:'Asia/Jakarta',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  [['No. Pesanan','OD-'+o.num],['Tanggal',dt],['Kamar',o.room],['Perwakilan',o.rep]].forEach(([a,b])=>{T(a,L,y+14,`16px ${FONT}`);ctx.font=`16px ${FONT}`;
+    const lines=wrapText(ctx,b,MW-170);lines.forEach((s,k)=>T(s,R,y+14+k*22,`16px ${FONT}`,'right'));y+=27+(lines.length-1)*22});
+  y+=2;line();T('PESANAN',L,y+20,`bold 22px ${FONT}`);y+=38;
+  const ind=o.mode=='individual',m={};
   o.items.forEach(i=>{const k=lab(i)+'|'+i.price+(ind?'':'|'+i.note);m[k]=m[k]||{n:lab(i),p:i.price,q:0,note:ind?'':i.note};m[k].q+=i.qty});
-  const per=ind?`<hr><b>Per nama:</b>${Object.entries(group(o.items)).map(([w,a])=>`<div>${esc(w)}: ${a.map(i=>`${i.qty}× ${esc(lab(i))}`).join(', ')}${a[0].note?`<br><i>Ket: ${esc(a[0].note)}</i>`:''}</div>`).join('')}`:'';
-  const h=`<html><head><title>${nm(o)}</title><style>@page{size:${RECEIPT_W} auto;margin:2mm}body{font:11px/1.35 monospace;margin:0}table{width:100%;border-collapse:collapse}td{vertical-align:top;padding:1px 0}.r{text-align:right}hr{border:0;border-top:1px dashed #000}</style></head><body>
-  <center><b style="font-size:15px">${BRAND}</b></center><div>No: ${nm(o)}<br>Tgl: ${tm(o.created_at)}<br>Kamar: ${esc(o.room)}<br>Perwakilan: ${esc(o.rep)}</div><hr>
-  <table>${Object.values(m).map(r=>`<tr><td colspan="2">${esc(r.n)}${r.note?`<br><i>Ket: ${esc(r.note)}</i>`:''}</td></tr><tr><td>${r.q} × ${rp(r.p)}</td><td class="r">${rp(r.q*r.p)}</td></tr>`).join('')}</table><hr>
-  <table><tr><td><b>TOTAL</b></td><td class="r"><b>${rp(o.total)}</b></td></tr></table><div>Pembayaran: <b>${o.paid?'LUNAS':'BELUM LUNAS'}</b></div>${per}<hr><center>Terima kasih</center></body></html>`;
-  const w=open('','_blank');w.document.write(h);w.document.close();setTimeout(()=>w.print(),300)}
+  Object.values(m).forEach(r=>{ctx.font=`22px ${FONT}`;wrapText(ctx,r.n,MW).forEach(s=>{T(s,L,y+20,`22px ${FONT}`);y+=28});
+    T(`${r.q} × ${rp(r.p)}`,L+8,y+14,`16px ${FONT}`);T(rp(r.q*r.p),R,y+16,`bold 24px ${FONT}`,'right');y+=32;
+    if(r.note){ctx.font=`italic 16px ${FONT}`;wrapText(ctx,'Ket: '+r.note,MW-8).forEach(s=>{T(s,L+8,y+12,`italic 16px ${FONT}`);y+=22})}y+=6});
+  line();T('TOTAL',L,y+28,`bold 30px ${FONT}`);T(rp(o.total),R,y+28,`bold 30px ${FONT}`,'right');y+=52;
+  T('PEMBAYARAN: '+(o.paid?'LUNAS':'BELUM LUNAS'),RW/2,y+14,`bold 22px ${FONT}`,'center');y+=40;
+  if(ind){line();T('RINCIAN PER NAMA',L,y+20,`bold 22px ${FONT}`);y+=40;
+    Object.entries(group(o.items)).forEach(([w,a])=>{T(w,L,y+20,`bold 22px ${FONT}`);y+=28;ctx.font=`16px ${FONT}`;
+      wrapText(ctx,a.map(i=>`${i.qty}× ${lab(i)}`).join(', '),MW-12).forEach(s=>{T(s,L+10,y+14,`16px ${FONT}`);y+=22});
+      const nt=(a.find(i=>i.note)||{}).note;if(nt){ctx.font=`italic 16px ${FONT}`;wrapText(ctx,'Ket: '+nt,MW-12).forEach(s=>{T(s,L+10,y+14,`italic 16px ${FONT}`);y+=22})}y+=12})}
+  line();T('Terima kasih!',RW/2,y+22,`bold 24px ${FONT}`,'center');y+=34;T(BRAND,RW/2,y+16,`16px ${FONT}`,'center');return y+40}
+async function printR(id){const o=O.find(x=>x.id==id),logo=await loadLogo();
+  const tmp=document.createElement('canvas');tmp.width=RW;tmp.height=9000;const tc=tmp.getContext('2d');tc.fillStyle='#fff';tc.fillRect(0,0,RW,9000);
+  const H=drawReceipt(tc,o,logo),c=document.createElement('canvas');c.width=RW;c.height=H;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,RW,H);drawReceipt(x,o,logo);
+  c.toBlob(async b=>{const name=`struk-${nm(o)}.jpg`,url=URL.createObjectURL(b),f=new File([b],name,{type:'image/jpeg'}),can=navigator.canShare&&navigator.canShare({files:[f]});
+    $('#dlg').innerHTML=`<h3 style="margin-top:0">Struk ${nm(o)}</h3><img src="${url}" style="width:100%;border:1px solid #ddd;border-radius:6px">
+    <div class="bar"><a class="b" href="${url}" download="${name}" style="text-decoration:none;color:#111">Unduh JPG</a>${can?'<button class="b" id="shr">Bagikan</button>':''}<button class="b" onclick="$('#dlg').close()">Tutup</button></div>
+    <small>Ukuran ${RW}×${H} px (lebar kertas 58mm). Di HP: Unduh lalu buka di aplikasi printer, atau tekan Bagikan.</small>`;
+    if(can)$('#shr').onclick=()=>navigator.share({files:[f]}).catch(()=>{});$('#dlg').showModal()},'image/jpeg',0.95)}
 /* ---------- Dapur / Rekap ---------- */
 function totals(){const m={};active().forEach(o=>o.items.forEach(i=>{const k=lab(i);m[k]=m[k]||{n:k,q:0,r:0};m[k].q+=i.qty;m[k].r+=i.qty*i.price}));return Object.values(m)}
 function pack(o){const m={};
