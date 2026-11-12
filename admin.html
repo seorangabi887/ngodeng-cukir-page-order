@@ -15,7 +15,7 @@ input,select{font:inherit;padding:7px;border:2px solid #111;border-radius:8px;ba
 .bar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;align-items:center}.room{background:#fff;border-radius:10px;padding:10px;margin-bottom:8px}
 .tom{color:#c40000;font-weight:800}.thumb{width:40px;height:40px;object-fit:cover;border-radius:6px;background:#eee}
 dialog{border:0;border-radius:16px;background:#fff;color:#111;width:min(520px,94vw);padding:18px;max-height:88vh;overflow:auto}dialog::backdrop{background:#0008}
-.hc{border:1px solid #eee;border-radius:10px;padding:10px;margin:10px 0}.add{color:#0a7a2f}.rem{color:#c40000}
+.gh td{background:var(--red);color:#fff;font-weight:800}.hc{border:1px solid #eee;border-radius:10px;padding:10px;margin:10px 0}.add{color:#0a7a2f}.rem{color:#c40000}
 </style></head><body>
 <header><h1>NGODENG CUKIR · Dashboard</h1><nav id="nav"></nav><button class="b" id="out">Keluar</button></header>
 <main id="m">Memuat…</main><dialog id="dlg"></dialog>
@@ -23,17 +23,17 @@ dialog{border:0;border-radius:16px;background:#fff;color:#111;width:min(520px,94
 <script>
 const ST=['baru','dikonfirmasi','disiapkan','selesai','batal'];
 const today=()=>new Date().toLocaleDateString('sv',{timeZone:'Asia/Jakarta'});
-let tab='orders',O=[],P=[],S={},fq='',fs='',D=today(),ALL=false;
+let tab='orders',O=[],P=[],S={},R=[],fq='',fs='',D=today(),ALL=false;
 const active=()=>O.filter(o=>o.status!='batal'),nm=o=>'OD-'+o.num;
 const tm=s=>new Date(s).toLocaleString('id-ID',{timeZone:'Asia/Jakarta',dateStyle:'medium',timeStyle:'short'});
 $('#out').onclick=async()=>{await sb.auth.signOut();location.href='login.html'};
 (async()=>{if(!(await sb.auth.getSession()).data.session)return location.href='login.html';
-  $('#nav').innerHTML=[['orders','Pesanan'],['kitchen','Dapur & Rekap'],['products','Produk'],['settings','Pengaturan']].map(([k,l])=>`<button data-t="${k}">${l}</button>`).join('');
+  $('#nav').innerHTML=[['orders','Pesanan'],['kitchen','Dapur & Bahan'],['recipes','Resep'],['products','Produk'],['settings','Pengaturan']].map(([k,l])=>`<button data-t="${k}">${l}</button>`).join('');
   $('#nav').onclick=e=>{if(e.target.dataset.t){tab=e.target.dataset.t;draw()}};
   await load();setInterval(()=>{if(['orders','kitchen'].includes(tab)&&!$('#dlg').open&&!document.activeElement.closest('main'))load()},30000)})();
 async function load(){let q=sb.from('orders').select('*').order('created_at');if(!ALL)q=q.eq('order_date',D);
-  [O,P,S]=await Promise.all([q.then(r=>r.data||[]),sb.from('products').select('*').order('sort').then(r=>r.data||[]),sb.from('settings').select('*').single().then(r=>r.data||{})]);draw()}
-function draw(){document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab));$('#m').innerHTML={orders:vOrders,kitchen:vKitchen,products:vProducts,settings:vSettings}[tab]()}
+  [O,P,S,R]=await Promise.all([q.then(r=>r.data||[]),sb.from('products').select('*').order('sort').then(r=>r.data||[]),sb.from('settings').select('*').single().then(r=>r.data||{}),sb.from('recipes').select('*').order('sort').then(r=>r.data||[])]);draw()}
+function draw(){document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab));$('#m').innerHTML={orders:vOrders,kitchen:vKitchen,recipes:vRecipes,products:vProducts,settings:vSettings}[tab]()}
 const shift=n=>{const d=new Date(D+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);D=d.toISOString().slice(0,10);ALL=false;load()};
 const dateBar=()=>`<div class="bar"><button class="b" onclick="shift(-1)">‹</button><input type="date" value="${D}" ${ALL?'disabled':''} onchange="if(this.value){D=this.value;load()}"><button class="b" onclick="shift(1)">›</button>
 <button class="b" onclick="D=today();ALL=false;load()">Hari ini</button><label><input type="checkbox" ${ALL?'checked':''} onchange="ALL=this.checked;load()"> Semua tanggal (riwayat)</label></div>`;
@@ -91,29 +91,66 @@ function drawReceipt(ctx,o,logo){
       wrapText(ctx,a.map(i=>`${i.qty}× ${lab(i)}`).join(', '),MW-12).forEach(s=>{T(s,L+10,y+14,`16px ${FONT}`);y+=22});
       const nt=(a.find(i=>i.note)||{}).note;if(nt){ctx.font=`italic 16px ${FONT}`;wrapText(ctx,'Ket: '+nt,MW-12).forEach(s=>{T(s,L+10,y+14,`italic 16px ${FONT}`);y+=22})}y+=12})}
   line();T('Terima kasih!',RW/2,y+22,`bold 24px ${FONT}`,'center');y+=34;T(BRAND,RW/2,y+16,`16px ${FONT}`,'center');return y+40}
-async function printR(id){const o=O.find(x=>x.id==id),logo=await loadLogo();
-  const tmp=document.createElement('canvas');tmp.width=RW;tmp.height=9000;const tc=tmp.getContext('2d');tc.fillStyle='#fff';tc.fillRect(0,0,RW,9000);
-  const H=drawReceipt(tc,o,logo),c=document.createElement('canvas');c.width=RW;c.height=H;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,RW,H);drawReceipt(x,o,logo);
-  c.toBlob(async b=>{const name=`struk-${nm(o)}.jpg`,url=URL.createObjectURL(b),f=new File([b],name,{type:'image/jpeg'}),can=navigator.canShare&&navigator.canShare({files:[f]});
-    $('#dlg').innerHTML=`<h3 style="margin-top:0">Struk ${nm(o)}</h3><img src="${url}" style="width:100%;border:1px solid #ddd;border-radius:6px">
-    <div class="bar"><a class="b" href="${url}" download="${name}" style="text-decoration:none;color:#111">Unduh JPG</a>${can?'<button class="b" id="shr">Bagikan</button>':''}<button class="b" onclick="$('#dlg').close()">Tutup</button></div>
-    <small>Ukuran ${RW}×${H} px (lebar kertas 58mm). Di HP: Unduh lalu buka di aplikasi printer, atau tekan Bagikan.</small>`;
-    if(can)$('#shr').onclick=()=>navigator.share({files:[f]}).catch(()=>{});$('#dlg').showModal()},'image/jpeg',0.95)}
+function jpg(draw){const tmp=document.createElement('canvas');tmp.width=RW;tmp.height=9000;const tc=tmp.getContext('2d');tc.fillStyle='#fff';tc.fillRect(0,0,RW,9000);
+  const H=draw(tc),c=document.createElement('canvas');c.width=RW;c.height=H;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,RW,H);draw(x);
+  return new Promise(r=>c.toBlob(b=>r({b,H}),'image/jpeg',0.95))}
+function showJpg(title,name,{b,H}){const url=URL.createObjectURL(b),f=new File([b],name,{type:'image/jpeg'}),can=navigator.canShare&&navigator.canShare({files:[f]});
+  $('#dlg').innerHTML=`<h3 style="margin-top:0">${esc(title)}</h3><img src="${url}" style="width:100%;border:1px solid #ddd;border-radius:6px">
+  <div class="bar"><a class="b" href="${url}" download="${esc(name)}" style="text-decoration:none;color:#111">Unduh JPG</a>${can?'<button class="b" id="shr">Bagikan</button>':''}<button class="b" onclick="$('#dlg').close()">Tutup</button></div>
+  <small>Ukuran ${RW}×${H} px (lebar kertas 58mm). Di HP: Unduh lalu buka di aplikasi printer, atau tekan Bagikan.</small>`;
+  if(can)$('#shr').onclick=()=>navigator.share({files:[f]}).catch(()=>{});$('#dlg').showModal()}
+async function printR(id){const o=O.find(x=>x.id==id),logo=await loadLogo();showJpg('Struk '+nm(o),`struk-${nm(o)}.jpg`,await jpg(c=>drawReceipt(c,o,logo)))}
+async function kitchenJpg(){const k=kitchenData();showJpg('Struk dapur',`struk-dapur-${ALL?'semua':D}.jpg`,await jpg(c=>drawKitchen(c,k)))}
+function drawKitchen(ctx,k){const L=PAD,Rr=RW-PAD,MW=Rr-L;let y=24;
+  const T=(t,x,yy,f,al='left')=>{ctx.font=f;ctx.textAlign=al;ctx.fillText(t,x,yy)},line=()=>{ctx.fillRect(L,y,MW,2);y+=22};
+  ctx.fillStyle='#000';ctx.textBaseline='alphabetic';
+  T('STRUK DAPUR',RW/2,y+30,`bold 34px ${FONT}`,'center');y+=46;T(BRAND,RW/2,y+14,`16px ${FONT}`,'center');y+=32;
+  T(k.label,RW/2,y+14,`bold 18px ${FONT}`,'center');y+=28;T(`${k.rooms} kamar · ${k.orders} pesanan · ${k.items} item`,RW/2,y+14,`16px ${FONT}`,'center');y+=32;line();
+  T('PRODUKSI',L,y+22,`bold 26px ${FONT}`);y+=46;
+  if(!k.groups.length){T('Belum ada pesanan aktif.',L,y+16,`18px ${FONT}`);y+=36}
+  k.groups.forEach(g=>{ctx.fillStyle='#000';ctx.fillRect(L,y,MW,32);ctx.fillStyle='#fff';T(g.c.toUpperCase(),L+10,y+23,`bold 19px ${FONT}`);T(g.q+' item',Rr-10,y+23,`bold 19px ${FONT}`,'right');ctx.fillStyle='#000';y+=44;
+    g.rows.forEach(r=>{ctx.font=`22px ${FONT}`;const ls=wrapText(ctx,r.n,MW-90);ls.forEach((t,i)=>T(t,L+4,y+22+i*28,`22px ${FONT}`));T(String(r.q),Rr,y+24,`bold 30px ${FONT}`,'right');y+=Math.max(40,ls.length*28+12)});y+=8});
+  line();T('BAHAN',L,y+22,`bold 26px ${FONT}`);y+=46;
+  if(!k.bahan.length){T('Belum ada resep (isi di tab Resep).',L,y+16,`16px ${FONT}`);y+=34}
+  k.bahan.forEach(([n,q])=>{ctx.font=`22px ${FONT}`;const ls=wrapText(ctx,n,MW-110);ls.forEach((t,i)=>T(t,L+4,y+22+i*28,`22px ${FONT}`));T(num(q),Rr,y+24,`bold 30px ${FONT}`,'right');y+=Math.max(40,ls.length*28+12)});
+  line();T('Dibuat '+new Date().toLocaleString('id-ID',{timeZone:'Asia/Jakarta',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}),RW/2,y+14,`15px ${FONT}`,'center');return y+40}
 /* ---------- Dapur / Rekap ---------- */
-function totals(){const m={};active().forEach(o=>o.items.forEach(i=>{const k=lab(i);m[k]=m[k]||{n:k,q:0,r:0};m[k].q+=i.qty;m[k].r+=i.qty*i.price}));return Object.values(m)}
+const catOf=pid=>(P.find(p=>p.id==pid)||{}).category||'Lainnya',num=n=>String(Math.round(n*100)/100).replace('.',',');
+function totals(){const m={};active().forEach(o=>o.items.forEach(i=>{const k=lab(i);m[k]=m[k]||{n:k,c:catOf(i.pid),x:P.findIndex(p=>p.id==i.pid),q:0,r:0};m[k].q+=i.qty;m[k].r+=i.qty*i.price}));
+  return Object.values(m).sort((a,b)=>a.x-b.x||a.n.localeCompare(b.n))}
+function groups(){const T=totals(),cs=[...new Set(P.map(p=>p.category))];[...new Set(T.map(t=>t.c))].forEach(c=>{if(!cs.includes(c))cs.push(c)});
+  return cs.map(c=>{const rows=T.filter(t=>t.c==c);return{c,rows,q:rows.reduce((s,t)=>s+t.q,0),r:rows.reduce((s,t)=>s+t.r,0)}}).filter(g=>g.rows.length)}
+function bahan(){const m={},ord={},kuah={};R.forEach(r=>{if(!(r.ingredient in ord)||r.sort<ord[r.ingredient])ord[r.ingredient]=r.sort});
+  active().forEach(o=>o.items.forEach(i=>{R.filter(r=>r.product_id==i.pid).forEach(r=>m[r.ingredient]=(m[r.ingredient]||0)+ +r.qty*i.qty);if(i.broth)kuah[i.broth]=(kuah[i.broth]||0)+i.qty}));
+  return Object.entries(m).sort((a,b)=>ord[a[0]]-ord[b[0]]||a[0].localeCompare(b[0])).concat(Object.entries(kuah).map(([b,q])=>['Kuah '+b+' (porsi)',q]))}
+function kitchenData(){const a=active();return{label:ALL?'Semua tanggal':new Date(D+'T00:00:00Z').toLocaleDateString('id-ID',{timeZone:'UTC',weekday:'long',day:'numeric',month:'long',year:'numeric'}),
+  rooms:new Set(a.map(o=>o.room)).size,orders:a.length,items:a.reduce((s,o)=>s+o.items.reduce((x,i)=>x+i.qty,0),0),groups:groups(),bahan:bahan()}}
 function pack(o){const m={};
   o.items.forEach(i=>{const k=o.mode=='individual'?lab(i):lab(i)+(i.note?' ['+i.note+']':'');m[k]=m[k]||{q:0,w:[]};m[k].q+=i.qty;
     if(o.mode=='individual')m[k].w.push(`${esc(i.who)}${i.qty>1?'×'+i.qty:''}${i.note?' ('+esc(i.note)+')':''}`)});
   return Object.entries(m).map(([k,v])=>`<div><b>${v.q}×</b> ${tomy(k)}${v.w.length?` <span style="color:#555">(${v.w.join(', ')})</span>`:''}</div>`).join('')}
-function vKitchen(){const T=totals();
-  return `${dateBar()}<div class="bar"><button class="b" onclick="csv('rekap')">Unduh rekap (CSV)</button><button class="b" onclick="csv('detail')">Unduh detail per kamar (CSV)</button><button class="b" onclick="print()">Cetak halaman</button></div>
-  <h2>Total produksi</h2><div class="wrap"><table><tr><th>Menu</th><th>Jumlah</th><th>Omzet</th></tr>${T.map(t=>`<tr><td>${tomy(t.n)}</td><td style="font-size:22px"><b>${t.q}</b></td><td>${rp(t.r)}</td></tr>`).join('')||'<tr><td colspan="3">Belum ada pesanan aktif.</td></tr>'}
-  <tr><th>Total</th><th>${T.reduce((s,t)=>s+t.q,0)}</th><th>${rp(T.reduce((s,t)=>s+t.r,0))}</th></tr></table></div>
+function vKitchen(){const G=groups(),B=bahan(),tq=G.reduce((s,g)=>s+g.q,0),tr=G.reduce((s,g)=>s+g.r,0);
+  return `${dateBar()}<div class="bar"><button class="b" onclick="kitchenJpg()">Struk dapur (JPG)</button><button class="b" onclick="csv('rekap')">Rekap CSV</button><button class="b" onclick="csv('detail')">Detail per kamar CSV</button></div>
+  <h2>Total produksi</h2><div class="wrap"><table><tr><th>Menu</th><th>Jumlah</th><th>Omzet</th></tr>
+  ${G.map(g=>`<tr class="gh"><td colspan="3">${esc(g.c)} · ${g.q} item</td></tr>`+g.rows.map(t=>`<tr><td>${tomy(t.n)}</td><td style="font-size:22px"><b>${t.q}</b></td><td>${rp(t.r)}</td></tr>`).join('')).join('')||'<tr><td colspan="3">Belum ada pesanan aktif.</td></tr>'}
+  <tr><th>Total</th><th>${tq}</th><th>${rp(tr)}</th></tr></table></div>
+  <h2>Bahan persiapan</h2>${B.length?`<div class="wrap"><table><tr><th>Bahan</th><th>Jumlah</th></tr>${B.map(([n,q])=>`<tr><td>${esc(n)}</td><td style="font-size:20px"><b>${num(q)}</b></td></tr>`).join('')}</table></div>`:'<div class="room">Belum ada bahan yang dihitung. Isi resep di tab <b>Resep</b> (atau jalankan <code>schema3.sql</code>).</div>'}
   <h2>Packing per kamar</h2>${active().map(o=>`<div class="room"><b>Kamar ${esc(o.room)}</b> · ${esc(o.rep)} · ${nm(o)} ${o.modified?'<span class="tag">DIUBAH</span>':''}<br>${pack(o)}<b>Total ${o.items.reduce((s,i)=>s+i.qty,0)} item</b></div>`).join('')}`}
-function csv(kind){const rows=kind=='rekap'?[['Menu','Jumlah','Omzet'],...totals().map(t=>[t.n,t.q,t.r])]
+function csv(kind){const rows=kind=='rekap'?[['Kategori','Menu','Jumlah','Omzet'],...totals().map(t=>[t.c,t.n,t.q,t.r])]
   :[['Tanggal','No','Kamar','Perwakilan','Nama','Menu','Kuah','Jumlah','Harga','Subtotal','Keterangan'],...active().flatMap(o=>o.items.map(i=>[o.order_date,nm(o),o.room,o.rep,i.who,i.name,i.broth||'',i.qty,i.price,i.qty*i.price,i.note||'']))];
   const t='\ufeff'+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\r\n'),a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([t],{type:'text/csv'}));a.download=`ngodeng-${kind}-${ALL?'semua':D}.csv`;a.click()}
+/* ---------- Resep ---------- */
+function vRecipes(){const ing=[...new Set(R.map(r=>r.ingredient))];
+  return `<datalist id="il">${ing.map(i=>`<option value="${esc(i)}">`).join('')}</datalist><p><small>Isi bahan untuk <b>1 porsi</b> tiap menu. Hasilnya dijumlahkan otomatis di tab Dapur dan struk dapur. Kuah dihitung otomatis dari pilihan pemesan.</small></p>
+  ${P.filter(p=>p.active).map(p=>`<div class="room"><b>${esc(p.name)}</b> <small>(${esc(p.category)})</small><table>${R.filter(r=>r.product_id==p.id).map(r=>`<tr><td><input list="il" value="${esc(r.ingredient)}" onchange="upR('${r.id}',{ingredient:this.value.trim()})"></td>
+  <td><input type="number" step="any" min="0" style="width:90px" value="${r.qty}" onchange="upR('${r.id}',{qty:+this.value})"></td><td style="width:50px"><button class="b" onclick="delR('${r.id}')">×</button></td></tr>`).join('')}</table>
+  <div class="bar"><input list="il" id="ri-${p.id}" placeholder="Bahan baru"><input type="number" step="any" min="0" id="rq-${p.id}" placeholder="Jumlah" style="width:90px"><button class="b" onclick="addR('${p.id}')">+ Tambah</button></div></div>`).join('')}`}
+async function upR(id,v){if(v.ingredient==='')return load();const{error}=await sb.from('recipes').update(v).eq('id',id);if(error)alert(error.message);load()}
+async function delR(id){if(!confirm('Hapus bahan ini dari resep?'))return;await sb.from('recipes').delete().eq('id',id);load()}
+async function addR(pid){const n=$('#ri-'+pid).value.trim(),q=$('#rq-'+pid).value;if(!n||q==='')return alert('Isi nama bahan dan jumlah.');
+  const ex=R.find(r=>r.ingredient==n),so=ex?ex.sort:Math.max(0,...R.map(r=>r.sort))+1;
+  const{error}=await sb.from('recipes').insert({product_id:pid,ingredient:n,qty:+q,sort:so});if(error)alert(error.message.includes('duplicate')?'Bahan itu sudah ada di menu ini.':error.message);load()}
 /* ---------- Produk ---------- */
 function vProducts(){const cs=[...new Set(P.map(p=>p.category))];
   return `<datalist id="cl">${cs.map(c=>`<option value="${esc(c)}">`).join('')}</datalist><div class="wrap"><table><tr><th>Gambar</th><th>Nama</th><th>Kategori</th><th>Harga</th><th>Kuah?</th><th>Aktif</th><th>Urut</th></tr>
