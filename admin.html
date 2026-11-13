@@ -15,7 +15,7 @@ input,select{font:inherit;padding:7px;border:2px solid #111;border-radius:8px;ba
 .bar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;align-items:center}.room{background:#fff;border-radius:10px;padding:10px;margin-bottom:8px}
 .tom{color:#c40000;font-weight:800}.thumb{width:40px;height:40px;object-fit:cover;border-radius:6px;background:#eee}
 dialog{border:0;border-radius:16px;background:#fff;color:#111;width:min(520px,94vw);padding:18px;max-height:88vh;overflow:auto}dialog::backdrop{background:#0008}
-.gh td{background:var(--red);color:#fff;font-weight:800}.hc{border:1px solid #eee;border-radius:10px;padding:10px;margin:10px 0}.add{color:#0a7a2f}.rem{color:#c40000}
+.gh td{background:var(--red);color:#fff;font-weight:800}.gs td{background:#ffd600;color:#111;font-weight:800;border-top:2px solid #111}.gs td:not(:first-child){font-size:17px}.hc{border:1px solid #eee;border-radius:10px;padding:10px;margin:10px 0}.add{color:#0a7a2f}.rem{color:#c40000}
 </style></head><body>
 <header><h1>NGODENG CUKIR · Dashboard</h1><nav id="nav"></nav><button class="b" id="out">Keluar</button></header>
 <main id="m">Memuat…</main><dialog id="dlg"></dialog>
@@ -132,7 +132,7 @@ function pack(o){const m={};
 function vKitchen(){const G=groups(),B=bahan(),tq=G.reduce((s,g)=>s+g.q,0),tr=G.reduce((s,g)=>s+g.r,0);
   return `${dateBar()}<div class="bar"><button class="b" onclick="kitchenJpg()">Struk dapur (JPG)</button><button class="b" onclick="csv('rekap')">Rekap CSV</button><button class="b" onclick="csv('detail')">Detail per kamar CSV</button></div>
   <h2>Total produksi</h2><div class="wrap"><table><tr><th>Menu</th><th>Jumlah</th><th>Omzet</th></tr>
-  ${G.map(g=>`<tr class="gh"><td colspan="3">${esc(g.c)} · ${g.q} item</td></tr>`+g.rows.map(t=>`<tr><td>${tomy(t.n)}</td><td style="font-size:22px"><b>${t.q}</b></td><td>${rp(t.r)}</td></tr>`).join('')).join('')||'<tr><td colspan="3">Belum ada pesanan aktif.</td></tr>'}
+  ${G.map(g=>`<tr class="gh"><td colspan="3">${esc(g.c)} · ${g.q} item</td></tr>`+g.rows.map(t=>`<tr><td>${tomy(t.n)}</td><td style="font-size:22px"><b>${t.q}</b></td><td>${rp(t.r)}</td></tr>`).join('')+`<tr class="gs"><td>Total ${esc(g.c)}</td><td>${g.q}</td><td>${rp(g.r)}</td></tr>`).join('')||'<tr><td colspan="3">Belum ada pesanan aktif.</td></tr>'}
   <tr><th>Total</th><th>${tq}</th><th>${rp(tr)}</th></tr></table></div>
   <h2>Bahan persiapan</h2>${B.length?`<div class="wrap"><table><tr><th>Bahan</th><th>Jumlah</th></tr>${B.map(([n,q])=>`<tr><td>${esc(n)}</td><td style="font-size:20px"><b>${num(q)}</b></td></tr>`).join('')}</table></div>`:'<div class="room">Belum ada bahan yang dihitung. Isi resep di tab <b>Resep</b> (atau jalankan <code>schema3.sql</code>).</div>'}
   <h2>Packing per kamar</h2>${active().map(o=>`<div class="room"><b>Kamar ${esc(o.room)}</b> · ${esc(o.rep)} · ${nm(o)} ${o.modified?'<span class="tag">DIUBAH</span>':''}<br>${pack(o)}<b>Total ${o.items.reduce((s,i)=>s+i.qty,0)} item</b></div>`).join('')}`}
